@@ -1,9 +1,0 @@
-name: crc32dir
-version: "0.1.0"
-author: Jack Gallagher <jack@gallabytes.com>
-about: checksums a directory quickly
-args:
-  - INPUT:
-    help: sets the root directory to use
-    required: true
-    index: 1
