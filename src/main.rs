@@ -67,9 +67,9 @@ fn main() {
     let path = args.value_of("INPUT").unwrap_or_else(|| ".");
     let walker = WalkDir::new(Path::new(path));
     let val = if args.is_present("sum") {
-        hash_dir(walker).expect("couldn't checksum - found no files")
-    } else {
         sum_dir(walker).unwrap_or_else(|e| panic!("{:?}", e))
+    } else {
+        hash_dir(walker).expect("couldn't checksum - found no files")
     };
     println!("{:08x}", val);
 }
