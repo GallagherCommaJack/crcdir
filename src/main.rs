@@ -1,21 +1,22 @@
 use clap::{App, Arg};
 use crc32fast::Hasher;
 use failure::*;
+use filebuffer::FileBuffer;
 use rayon::prelude::*;
-use std::{fs::File, io::Read, path::Path};
+use std::path::Path;
 use walkdir::WalkDir;
 
 fn hash_file(path: &Path) -> Result<u32, Error> {
     let mut hasher = Hasher::new();
+    let fbuffer = FileBuffer::open(path)?;
+    let len = fbuffer.len();
+    fbuffer.prefetch(0, len);
     hasher.update(
         path.to_str()
             .ok_or(format_err!("path couldn't be read as str: {:?}", path))?
             .as_bytes(),
     );
-    let mut buf = vec![];
-    let mut file = File::open(path)?;
-    file.read_to_end(&mut buf)?;
-    hasher.update(&buf);
+    hasher.update(&fbuffer);
     Ok(hasher.finalize())
 }
 
@@ -28,8 +29,7 @@ fn sum_dir(path: WalkDir) -> Result<u32, Error> {
         .reduce(|| Ok(0u32), |acc, i| Ok(acc?.wrapping_add(i?)))
 }
 
-fn hash_dir(path: WalkDir) -> Option<u32> {
-    let mut empty = true;
+fn hash_dir(path: WalkDir) -> Result<u32, Error> {
     let mut hasher = Hasher::new();
 
     for entry in path
@@ -37,19 +37,18 @@ fn hash_dir(path: WalkDir) -> Option<u32> {
         .filter_map(Result::ok)
         .filter(|d| d.file_type().is_file())
     {
-        empty = false;
         let path = entry.path();
-        hasher.update(path.to_str()?.as_bytes());
-        let mut buf = vec![];
-        let mut file = File::open(path).ok()?;
-        file.read_to_end(&mut buf).ok()?;
-        hasher.update(&buf);
+        let fbuffer = FileBuffer::open(path)?;
+        let len = fbuffer.len();
+        fbuffer.prefetch(0, len);
+        hasher.update(
+            path.to_str()
+                .ok_or(format_err!("path couldn't be read as str: {:?}", path))?
+                .as_bytes(),
+        );
+        hasher.update(&fbuffer);
     }
-    if empty {
-        None
-    } else {
-        Some(hasher.finalize())
-    }
+    Ok(hasher.finalize())
 }
 
 fn main() {
