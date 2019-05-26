@@ -22,7 +22,7 @@ fn main() {
         )
         .get_matches();
 
-    let path = args.value_of("INPUT").unwrap_or_else(|| ".");
+    let path = args.value_of("DIR").unwrap_or_else(|| ".");
     let walker = WalkDir::new(Path::new(path));
     let val = if args.is_present("serial") {
         hash_dir(walker).expect("couldn't checksum - found no files")
