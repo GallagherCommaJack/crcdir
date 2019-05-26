@@ -62,6 +62,13 @@ fn main() {
                 .long("--serial")
                 .help("serially hash directory instead of checksumming"),
         )
+        .arg(
+            Arg::with_name("jobs")
+                .short("-j")
+                .long("--jobs")
+                .takes_value(true)
+                .help("number of jobs to use when checksumming"),
+        )
         .get_matches();
 
     let path = args.value_of("INPUT").unwrap_or_else(|| ".");
@@ -69,7 +76,16 @@ fn main() {
     let val = if args.is_present("serial") {
         hash_dir(walker).expect("couldn't checksum - found no files")
     } else {
-        sum_dir(walker).unwrap_or_else(|e| panic!("{:?}", e))
+        let jobs: usize = if let Some(n) = args.value_of("jobs") {
+            n.parse().unwrap_or_else(|e| panic!("{:?}", e))
+        } else {
+            num_cpus::get()
+        };
+        rayon::ThreadPoolBuilder::new()
+            .num_threads(jobs)
+            .build()
+            .unwrap()
+            .install(|| sum_dir(walker).unwrap_or_else(|e| panic!("{:?}", e)))
     };
     println!("{:08x}", val);
 }
