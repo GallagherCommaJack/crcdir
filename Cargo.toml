@@ -6,6 +6,7 @@ license = "MIT OR Apache-2.0"
 description = "A thin wrapper around crc32fast to checksum an entire directory"
 edition = "2018"
 readme = "README.md"
+documentation = "https://docs.rs/crcdir"
 keywords = ["checksum", "crc", "crc32", "simd"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
