@@ -1,7 +1,5 @@
 use clap::{App, Arg};
-use crcdir::{hash_dir, sum_dir};
-use std::path::Path;
-use walkdir::WalkDir;
+use crcdir::*;
 
 fn main() {
     let args = App::new("crcdir")
@@ -23,9 +21,15 @@ fn main() {
         .get_matches();
 
     let path = args.value_of("DIR").unwrap_or_else(|| ".");
-    let walker = WalkDir::new(Path::new(path));
     let val = if args.is_present("serial") {
-        hash_dir(walker).expect("couldn't checksum - found no files")
+        #[cfg(feature = "progress")]
+        {
+            hash_dir_prog(path).expect("couldn't checksum - found no files")
+        }
+        #[cfg(not(feature = "progress"))]
+        {
+            hash_dir(path).expect("couldn't checksum - found no files")
+        }
     } else {
         let jobs: usize = if let Some(n) = args.value_of("jobs") {
             n.parse().unwrap_or_else(|e| panic!("{:?}", e))
@@ -36,7 +40,13 @@ fn main() {
             .num_threads(jobs)
             .build()
             .unwrap()
-            .install(|| sum_dir(walker).unwrap_or_else(|e| panic!("{:?}", e)))
+            .install(|| {
+                #[cfg(feature = "progress")]
+                let res = sum_dir_prog(path);
+                #[cfg(not(feature = "progress"))]
+                let res = sum_dir(path);
+                res.unwrap_or_else(|e| panic!("{:?}", e))
+            })
     };
     println!("{:08x}", val);
 }
