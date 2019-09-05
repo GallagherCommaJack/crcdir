@@ -29,20 +29,33 @@ pub fn progress_init(length: u64) {
 }
 
 pub fn hash_file<P: AsRef<Path>>(hasher: &mut Hasher, root: &Path, path: P) -> Result<(), Error> {
-    let fbuffer = FileBuffer::open(&path)?;
-    let len = fbuffer.len();
-    fbuffer.prefetch(0, len);
-    hasher.update(
-        path.as_ref()
-            .strip_prefix(root)?
-            .to_str()
-            .ok_or(format_err!(
-                "path couldn't be read as str: {:?}",
+    match FileBuffer::open(&path) {
+        Ok(fbuffer) => {
+            let len = fbuffer.len();
+            fbuffer.prefetch(0, len);
+            hasher.update(
                 path.as_ref()
-            ))?
-            .as_bytes(),
-    );
-    hasher.update(&fbuffer);
+                    .strip_prefix(root)?
+                    .to_str()
+                    .ok_or(format_err!(
+                        "path couldn't be read as str: {:?}",
+                        path.as_ref()
+                    ))?
+                    .as_bytes(),
+            );
+            hasher.update(&fbuffer);
+        }
+        Err(e) => {
+            let pathbuf = path.as_ref().to_path_buf();
+            dbg!(format!(
+                "failed to read filebuffer for {:?}, error was: {}",
+                pathbuf, e
+            ));
+            let contents = std::fs::read(path)
+                .map_err(move |e| format_err!("failed to open {:?}, error was: {}", pathbuf, e))?;
+            hasher.update(&contents);
+        }
+    }
     Ok(())
 }
 
@@ -74,13 +87,18 @@ pub fn sum_dir_prog<P: AsRef<Path> + Send + Sync>(rootdir: P) -> Result<u32, Err
 
     progress_init(vec.len() as u64);
 
-    vec.into_par_iter()
+    let res = vec
+        .into_par_iter()
         .map(move |e| {
             let hash = hash_file_oneshot(rootdir.as_ref(), e.path());
             PROGRESS_BAR.inc(1);
             hash
         })
-        .reduce(|| Ok(0u32), |acc, i| Ok(acc?.wrapping_add(i?)))
+        .reduce(|| Ok(0u32), |acc, i| Ok(acc?.wrapping_add(i?)));
+
+    PROGRESS_BAR.finish();
+
+    res
 }
 
 /// Walks a directory, hashing the files sequentially.
@@ -115,6 +133,8 @@ pub fn hash_dir_prog<P: AsRef<Path>>(rootdir: P) -> Result<u32, Error> {
         PROGRESS_BAR.inc(1);
         hash
     }
+
+    PROGRESS_BAR.finish();
 
     Ok(hasher.finalize())
 }

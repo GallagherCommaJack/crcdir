@@ -36,7 +36,7 @@ fn main() {
         } else {
             num_cpus::get()
         };
-        rayon::ThreadPoolBuilder::new()
+        let res = rayon::ThreadPoolBuilder::new()
             .num_threads(jobs)
             .build()
             .unwrap()
@@ -46,7 +46,8 @@ fn main() {
                 #[cfg(not(feature = "progress"))]
                 let res = sum_dir(path);
                 res.unwrap_or_else(|e| panic!("{:?}", e))
-            })
+            });
+        res
     };
     println!("{:08x}", val);
 }
